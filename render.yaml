@@ -1,0 +1,6 @@
+services:
+  - type: worker
+    name: openclaw-bot
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
