@@ -1,4 +1,3 @@
-// 1. HEARTBEAT SERVER (Satisfies Render's Port Scan)
 const http = require('http');
 const port = process.env.PORT || 8080;
 
