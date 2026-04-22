@@ -1,20 +1,20 @@
 const http = require('http');
 const port = process.env.PORT || 8080;
 
+// 1. Heartbeat Server for Render
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.write('Bubblebot is alive!');
-  res.end();
+  res.end('Bubblebot is alive!');
 }).listen(port, '0.0.0.0', () => {
   console.log(`Heartbeat server listening on port ${port}`);
 });
 
-// 2. BOT SYSTEM INSTRUCTIONS
+// 2. Bot Setup
 const { Telegraf } = require('telegraf');
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const SYSTEM_PROMPT = `You are the "Architect of the Abyss." 
 Your name is Bubblebot. 
@@ -23,18 +23,20 @@ You speak with a touch of cosmic wit and guide the user through the creation of 
 
 bot.on('text', async (ctx) => {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: ctx.message.text }
-      ],
+    // Access Gemini 1.5 Flash (fast and free)
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: SYSTEM_PROMPT 
     });
-    ctx.reply(response.choices[0].message.content);
+
+    const result = await model.generateContent(ctx.message.text);
+    const response = await result.response;
+    ctx.reply(response.text());
+
   } catch (error) {
-    console.error(error);
+    console.error("Error Details:", error);
     ctx.reply("The void is silent... check the logs.");
   }
 });
 
-bot.launch();
+bot.launch().then(() => console.log("Your service is live 🚀"));
