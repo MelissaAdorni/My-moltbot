@@ -1,34 +1,46 @@
-const http = require('http');
-const { Telegraf } = require('telegraf');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { Telegraf } = require("telegraf");
 
-// 1. Heartbeat Server
-http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Bubblebot is alive!');
-}).listen(process.env.PORT || 8080, '0.0.0.0');
-
-// 2. Bot Setup
-const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+// 1. Initialize the AI with your API Key from Render's Environment Variables
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const SYSTEM_PROMPT = `You are the "Architect of the Abyss." Your name is Bubblebot. 
-You are a minimalist, mysterious, and highly intelligent AI. 
-You speak with a touch of cosmic wit and guide the user through the creation of The Bubbleverse.`;
+// 2. Initialize the Telegram Bot with your Token from Render's Environment Variables
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-bot.on('text', async (ctx) => {
+// 3. Set the model to 1.5 Flash (the stable version)
+const model = genAI.getGenerativeModel({ 
+  model: "gemini-1.5-flash-latest",
+  systemInstruction: "You are the Architect of the Bubbleverse. You are helpful, insightful, and clear."
+});
+
+// 4. Handle incoming messages
+bot.on("text", async (ctx) => {
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
-      systemInstruction: SYSTEM_PROMPT 
-    });
-    const result = await model.generateContent(ctx.message.text);
+    // Show the bot is "typing" so users know it's working
+    await ctx.sendChatAction("typing");
+
+    const prompt = ctx.message.text;
+    const result = await model.generateContent(prompt);
     const response = await result.response;
-    ctx.reply(response.text() || "The abyss is empty...");
+    const text = response.text();
+
+    await ctx.reply(text);
   } catch (error) {
-    console.error("AI Error:", error);
-    ctx.reply("The void is silent... check the logs.");
+    console.error("Error:", error);
+    // This helps you see in the Render logs if there's still a billing issue
+    if (error.message.includes("quota")) {
+      await ctx.reply("I'm resting my brain for a moment (Quota Limit). Try again in a minute!");
+    } else {
+      await ctx.reply("Sorry, I hit a snag. Let me try to reconnect.");
+    }
   }
 });
 
-bot.launch().then(() => console.log("Bubblebot is live 🚀"));
+// 5. Launch the bot
+bot.launch().then(() => {
+  console.log("The Architect is online and live! 🚀");
+});
+
+// Enable graceful stop for Render
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
