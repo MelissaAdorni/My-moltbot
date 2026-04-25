@@ -9,7 +9,7 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 // 3. Set the model to 1.5 Flash (the stable version)
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-1.5-flash-latest",
+  model: "gemini-1.5-flash",
   systemInstruction: "You are the Architect of the Bubbleverse. You are helpful, insightful, and clear."
 });
 
@@ -44,3 +44,6 @@ bot.launch().then(() => {
 // Enable graceful stop for Render
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
+// This keeps Render from timing out
+const http = require('http');
+http.createServer((req, res) => { res.writeHead(200); res.end('Bot is running'); }).listen(process.env.PORT || 3000);
