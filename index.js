@@ -13,7 +13,8 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 // FIXED MODEL NAME HERE
 const model = genAI.getGenerativeModel({ 
-model: "models/gemini-1.5-flash"
+model: "gemini-pro"
+
  
 }, { apiVersion: 'v1' });
 
