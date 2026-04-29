@@ -2,7 +2,6 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { Telegraf } = require("telegraf");
 const http = require('http');
 
-// This keeps Render happy
 http.createServer((req, res) => {
   res.writeHead(200);
   res.end('The Architect is Awake.');
@@ -11,7 +10,6 @@ http.createServer((req, res) => {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-// FIXED MODEL NAME HERE
 const model = genAI.getGenerativeModel({ 
 model: "gemini-1.5-flash"
 
