@@ -1,43 +1,36 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const TelegramBot = require("node-telegram-bot-api");
-require("dotenv").config();
+const { Telegraf } = require("telegraf");
+const http = require('http');
 
-// 1. Initialize Telegram Bot
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
+// Keep the service alive for Render
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('The Architect is Awake.');
+}).listen(process.env.PORT || 3000);
 
-// 2. Initialize Google Gemini
+// Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// We grab the name from Render. If you forget to set it, 
-// we use 'gemini-3.1-flash-lite-preview' as the 2026 fallback.
 const modelName = process.env.MODEL_NAME || "gemini-3.1-flash-lite-preview";
 const model = genAI.getGenerativeModel({ model: modelName });
 
-console.log(`Bubblebot is waking up using model: ${modelName}`);
+// Initialize Telegram Bot
+const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-// 3. Handle incoming messages
-bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const userInput = msg.text;
-
-  if (!userInput) return;
-
+bot.on("text", async (ctx) => {
   try {
-    // Generate response from Gemini
-    const result = await model.generateContent(userInput);
+    const result = await model.generateContent(ctx.message.text);
     const response = await result.response;
-    const text = response.text();
-
-    // Send the AI response back to Telegram
-    bot.sendMessage(chatId, text);
+    await ctx.reply(response.text());
   } catch (error) {
-    console.error("Gemini Error:", error.message);
-    bot.sendMessage(chatId, "Sorry, my brain is a bit foggy. Try again in a second!");
+    console.error("Error:", error);
+    await ctx.reply("The system is syncing... try again in a moment.");
   }
 });
 
-// Error handling for the bot
-bot.on("polling_error", (error) => {
-  console.log("Telegram Polling Error:", error.code); 
+bot.launch().then(() => {
+  console.log(`The Architect is online using ${modelName}!`);
 });
+
+// Enable graceful stop
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
