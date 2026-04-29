@@ -1,33 +1,43 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { Telegraf } = require("telegraf");
-const http = require('http');
+const TelegramBot = require("node-telegram-bot-api");
+require("dotenv").config();
 
-http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end('The Architect is Awake.');
-}).listen(process.env.PORT || 3000);
+// 1. Initialize Telegram Bot
+const token = process.env.TELEGRAM_BOT_TOKEN;
+const bot = new TelegramBot(token, { polling: true });
 
+// 2. Initialize Google Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-const model = genAI.getGenerativeModel({ 
-model: "gemini-1.5-flash"});
+// We grab the name from Render. If you forget to set it, 
+// we use 'gemini-3.1-flash-lite-preview' as the 2026 fallback.
+const modelName = process.env.MODEL_NAME || "gemini-3.1-flash-lite-preview";
+const model = genAI.getGenerativeModel({ model: modelName });
 
- 
-}, { apiVersion: 'v1' });
+console.log(`Bubblebot is waking up using model: ${modelName}`);
 
+// 3. Handle incoming messages
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const userInput = msg.text;
 
-bot.on("text", async (ctx) => {
+  if (!userInput) return;
+
   try {
-    const result = await model.generateContent(ctx.message.text);
+    // Generate response from Gemini
+    const result = await model.generateContent(userInput);
     const response = await result.response;
-    await ctx.reply(response.text());
+    const text = response.text();
+
+    // Send the AI response back to Telegram
+    bot.sendMessage(chatId, text);
   } catch (error) {
-    console.error("Error:", error);
-    await ctx.reply("The system is syncing. Try one more time in a second!");
+    console.error("Gemini Error:", error.message);
+    bot.sendMessage(chatId, "Sorry, my brain is a bit foggy. Try again in a second!");
   }
 });
 
-bot.launch().then(() => {
-  console.log("The Architect is online! 🚀");
+// Error handling for the bot
+bot.on("polling_error", (error) => {
+  console.log("Telegram Polling Error:", error.code); 
 });
