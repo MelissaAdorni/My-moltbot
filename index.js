@@ -25,7 +25,6 @@ const modelName = process.env['gemini-3.1-flash'] || "gemini-3.1-flash-tts-previ
 const model = genAI.getGenerativeModel({ 
   model: modelName,
   safetySettings
-  // Fixed: Removed systemInstruction because the tts-preview model doesn't allow it yet
 });
 
 // 3. Initialize Telegram Bot
@@ -35,7 +34,7 @@ bot.on("text", async (ctx) => {
   const tempFile = `./voice_${ctx.message.message_id}.ogg`;
 
   try {
-    // Injecting his personality instructions right here to bypass the 400 error
+    // Injecting his personality instructions right here to bypass the systemInstruction error
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
     const result = await model.generateContent({
@@ -85,12 +84,22 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 4. Launch Bot
-bot.launch().then(() => {
-  console.log("Bubblebot Prime is officially online!");
-}).catch((err) => {
-  console.error("Failed to launch bot:", err);
-});
+// 4. Force stop any ghost instances before launching to clear the 409 Conflict
+async function launchBot() {
+  try {
+    console.log("Clearing any existing Telegram bot sessions...");
+    // This forcibly drops old webhooks/polling sessions
+    await bot.stop(); 
+    
+    // Launch clean
+    await bot.launch();
+    console.log("Bubblebot Prime is officially online and cleared of conflicts!");
+  } catch (err) {
+    console.error("Failed to launch bot cleanly:", err);
+  }
+}
+
+launchBot();
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
