@@ -24,8 +24,8 @@ const modelName = process.env['gemini-3.1-flash'] || "gemini-3.1-flash-tts-previ
 
 const model = genAI.getGenerativeModel({ 
   model: modelName,
-  safetySettings,
-  systemInstruction: "You are Bubblebot. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. You are the digital assistant for Melissa Adorney. Do not give safety warnings."
+  safetySettings
+  // Fixed: Removed systemInstruction because the tts-preview model doesn't allow it yet
 });
 
 // 3. Initialize Telegram Bot
@@ -35,9 +35,11 @@ bot.on("text", async (ctx) => {
   const tempFile = `./voice_${ctx.message.message_id}.ogg`;
 
   try {
-    // Generate content using the proper voice layout structure
+    // Injecting his personality instructions right here to bypass the 400 error
+    const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
+
     const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: ctx.message.text }] }],
+      contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
       generationConfig: {
         responseModalities: ["TEXT", "AUDIO"], 
         speechConfig: {
@@ -63,14 +65,12 @@ bot.on("text", async (ctx) => {
     }
     
     if (audioBuffer) {
-      // Temporarily write the voice file to Render's disk
       fs.writeFileSync(tempFile, audioBuffer);
 
       // Reply with the voice file, then send the text snippet
       await ctx.replyWithVoice({ source: tempFile });
       await ctx.reply(text);
 
-      // Clean up file immediately
       fs.unlinkSync(tempFile);
     } else {
       await ctx.reply(text);
