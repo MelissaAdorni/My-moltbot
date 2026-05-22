@@ -19,7 +19,6 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
-// Matches the exact key name from your Render Environment screenshot
 const modelName = process.env['gemini-3.1-flash'] || "gemini-3.1-flash-tts-preview";
 
 const model = genAI.getGenerativeModel({ 
@@ -34,7 +33,6 @@ bot.on("text", async (ctx) => {
   const tempFile = `./voice_${ctx.message.message_id}.ogg`;
 
   try {
-    // Injecting his personality instructions right here to bypass the systemInstruction error
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
     const result = await model.generateContent({
@@ -54,7 +52,6 @@ bot.on("text", async (ctx) => {
     const response = await result.response;
     const text = response.text();
 
-    // Extract the raw audio bytes directly from the response package
     let audioBuffer = null;
     if (response.candidates && response.candidates[0].content.parts) {
       const audioPart = response.candidates[0].content.parts.find(part => part.inlineData && part.inlineData.mimeType.startsWith('audio/'));
@@ -65,11 +62,8 @@ bot.on("text", async (ctx) => {
     
     if (audioBuffer) {
       fs.writeFileSync(tempFile, audioBuffer);
-
-      // Reply with the voice file, then send the text snippet
       await ctx.replyWithVoice({ source: tempFile });
       await ctx.reply(text);
-
       fs.unlinkSync(tempFile);
     } else {
       await ctx.reply(text);
@@ -84,16 +78,19 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 4. Force stop any ghost instances before launching to clear the 409 Conflict
+// 4. Launch Bot Cleanly
 async function launchBot() {
   try {
-    console.log("Clearing any existing Telegram bot sessions...");
-    // This forcibly drops old webhooks/polling sessions
-    await bot.stop(); 
+    console.log("Launching Bubblebot and clearing active webhooks...");
     
-    // Launch clean
-    await bot.launch();
-    console.log("Bubblebot Prime is officially online and cleared of conflicts!");
+    // dropPendingUpdates: true tells Telegram to clear out old built-up messages 
+    // and immediately severs any zombie sessions hanging around on Render.
+    await bot.launch({
+      allowedUpdates: ['message'],
+      dropPendingUpdates: true 
+    });
+    
+    console.log("Bubblebot Prime is officially online!");
   } catch (err) {
     console.error("Failed to launch bot cleanly:", err);
   }
