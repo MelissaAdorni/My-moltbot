@@ -78,25 +78,13 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 4. Launch Bot Cleanly
-async function launchBot() {
-  try {
-    console.log("Launching Bubblebot and clearing active webhooks...");
-    
-    // dropPendingUpdates: true tells Telegram to clear out old built-up messages 
-    // and immediately severs any zombie sessions hanging around on Render.
-    await bot.launch({
-      allowedUpdates: ['message'],
-      dropPendingUpdates: true 
-    });
-    
-    console.log("Bubblebot Prime is officially online!");
-  } catch (err) {
-    console.error("Failed to launch bot cleanly:", err);
-  }
-}
-
-launchBot();
+// 4. Standard Launch Syntax (Clears conflicts safely via callback)
+bot.launch({
+  allowedUpdates: ['message'],
+  dropPendingUpdates: true 
+}, () => {
+  console.log("Bubblebot Prime is officially online and stable!");
+});
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
