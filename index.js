@@ -50,8 +50,16 @@ bot.on("text", async (ctx) => {
     });
 
     const response = await result.response;
-    const text = response.text();
+    
+    // Safely extract text transcript, trimming out any empty whitespace
+    let text = "";
+    try {
+      text = response.text() ? response.text().trim() : "";
+    } catch (e) {
+      text = "";
+    }
 
+    // Extract the raw audio bytes directly from the response package
     let audioBuffer = null;
     if (response.candidates && response.candidates[0].content.parts) {
       const audioPart = response.candidates[0].content.parts.find(part => part.inlineData && part.inlineData.mimeType.startsWith('audio/'));
@@ -62,11 +70,19 @@ bot.on("text", async (ctx) => {
     
     if (audioBuffer) {
       fs.writeFileSync(tempFile, audioBuffer);
+      
+      // 1. Send the voice clip first
       await ctx.replyWithVoice({ source: tempFile });
-      await ctx.reply(text);
+      
+      // 2. Only send the text snippet if it actually contains words (avoids the 400 Empty error)
+      if (text && text.length > 0) {
+        await ctx.reply(text);
+      }
+      
       fs.unlinkSync(tempFile);
     } else {
-      await ctx.reply(text);
+      // Fallback if no audio clip was generated at all
+      await ctx.reply(text || "I processed that, but I've got nothing to say.");
     }
 
   } catch (error) {
@@ -78,7 +94,7 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 4. Standard Launch Syntax (Clears conflicts safely via callback)
+// 4. Standard Launch Syntax (Clears conflicts safely via callback setting)
 bot.launch({
   allowedUpdates: ['message'],
   dropPendingUpdates: true 
