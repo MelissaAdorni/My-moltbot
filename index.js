@@ -15,15 +15,15 @@ bot.on("text", async (ctx) => {
   try {
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
-    // Simple text payload layout
     const payload = {
       contents: [{ role: "user", parts: [{ text: contextPrompt }] }]
     };
 
     const apiKey = process.env.GEMINI_API_KEY;
-    // Using the stable, fast text model instead of the audio preview
     const targetModel = "gemini-1.5-flash"; 
-    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
+    
+    // FIXED: Using the stable /v1/ path for the standard production model
+    const apiURL = `https://generativelanguage.googleapis.com/v1/models/${targetModel}:generateContent?key=${apiKey}`;
 
     const apiResponse = await fetch(apiURL, {
       method: "POST",
@@ -38,7 +38,6 @@ bot.on("text", async (ctx) => {
 
     const data = await apiResponse.json();
     
-    // Safely extract text from response structure
     let botReply = "";
     if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
       botReply = data.candidates[0].content.parts[0].text || "";
@@ -56,7 +55,7 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 3. Launch and drop old pending voice loops instantly
+// 3. Launch and drop old pending update loops
 bot.launch({
   allowedUpdates: ['message'],
   dropPendingUpdates: true 
