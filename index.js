@@ -17,7 +17,7 @@ bot.on("text", async (ctx) => {
   try {
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
-    // Construct the payload manually
+    // Updated configuration mapping for direct API voice generation
     const payload = {
       contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
       generationConfig: {
@@ -29,20 +29,11 @@ bot.on("text", async (ctx) => {
             }
           }
         }
-      },
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-      ]
+      }
     };
 
     const apiKey = process.env.GEMINI_API_KEY;
-    
-    // FIXED: Explicitly hardcoding the true voice model so it never targets the "lite" version from Render variables
     const targetModel = "gemini-3.1-flash-tts-preview";
-
     const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
     const apiResponse = await fetch(apiURL, {
@@ -61,18 +52,19 @@ bot.on("text", async (ctx) => {
     let text = "";
     let audioBase64 = "";
 
+    // Parse out the exact data types returning from the JSON structure
     if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
       for (const part of data.candidates[0].content.parts) {
         if (part.text) {
           text += part.text;
         }
-        if (part.inlineData && part.inlineData.mimeType.startsWith("audio/") && part.inlineData.data) {
+        if (part.inlineData && part.inlineData.data && part.inlineData.mimeType.startsWith("audio/")) {
           audioBase64 = part.inlineData.data;
         }
       }
     }
 
-    // Only try to build a file if we got real, substantial voice data back
+    // Only attempt to send a voice note if valid base64 data exists
     if (audioBase64 && audioBase64.length > 500) {
       const audioBuffer = Buffer.from(audioBase64, 'base64');
       fs.writeFileSync(tempFile, audioBuffer);
@@ -85,8 +77,8 @@ bot.on("text", async (ctx) => {
 
       fs.unlinkSync(tempFile);
     } else {
-      // Fallback if the voice stream is still blank for any reason
-      await ctx.reply(text.trim() || "I'm processing, but my audio engine returned empty data.");
+      // Fallback text option if audio stream returns unpopulated
+      await ctx.reply(text.trim() || "My voice modulation engine is resetting, but I heard you.");
     }
 
   } catch (error) {
@@ -98,7 +90,7 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 3. Standard Launch Syntax with dropPendingUpdates to break old zombie loops
+// 3. Launch with strict clearing properties
 bot.launch({
   allowedUpdates: ['message'],
   dropPendingUpdates: true 
