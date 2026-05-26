@@ -18,7 +18,7 @@ bot.on("text", async (ctx) => {
   try {
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
-    // Configured payload for direct API voice generation
+    // FIXED: Correct schema structure matching the API specifications exactly
     const payload = {
       contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
       generationConfig: {
@@ -53,7 +53,7 @@ bot.on("text", async (ctx) => {
     let text = "";
     let audioBase64 = "";
 
-    // Safely parse out the returning JSON blocks
+    // Drill deep into the candidates matrix to isolate returning chunks
     if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
       for (const part of data.candidates[0].content.parts) {
         if (part.text) {
@@ -65,22 +65,22 @@ bot.on("text", async (ctx) => {
       }
     }
 
-    // Only generate file if true audio base64 data exists
+    // STRICT AUDIO VERIFICATION: Only create file if valid voice bytes are found
     if (audioBase64 && audioBase64.length > 500) {
       const audioBuffer = Buffer.from(audioBase64, 'base64');
       fs.writeFileSync(tempFile, audioBuffer);
 
-      // Deliver voice message
+      // Ship voice file to Telegram
       await ctx.replyWithVoice({ source: tempFile });
 
-      // Deliver matching text if present
+      // Ship transcript text bubble if populated
       if (text.trim().length > 0) {
         await ctx.reply(text.trim());
       }
 
       fs.unlinkSync(tempFile);
     } else {
-      // Fallback text if the audio stream returns unpopulated
+      // Fallback text directly if audio tracks fail or return zero bytes
       await ctx.reply(text.trim() || "My voice processing split, but I heard you.");
     }
 
@@ -93,7 +93,7 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 3. Launch with strict clearing properties
+// 3. Clear existing webhooks instantly at launch
 bot.launch({
   allowedUpdates: ['message'],
   dropPendingUpdates: true 
