@@ -35,6 +35,7 @@ bot.on("text", async (ctx) => {
   try {
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
+    // Requesting the content from Gemini
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
       generationConfig: {
@@ -51,7 +52,7 @@ bot.on("text", async (ctx) => {
 
     const response = await result.response;
     
-    // Safely extract text transcript, trimming out any empty whitespace
+    // 1. Extract Text Transcript safely
     let text = "";
     try {
       text = response.text() ? response.text().trim() : "";
@@ -59,30 +60,38 @@ bot.on("text", async (ctx) => {
       text = "";
     }
 
-    // Extract the raw audio bytes directly from the response package
+    // 2. Deep Parse Raw JSON to extract the actual audio bytes
     let audioBuffer = null;
-    if (response.candidates && response.candidates[0].content.parts) {
-      const audioPart = response.candidates[0].content.parts.find(part => part.inlineData && part.inlineData.mimeType.startsWith('audio/'));
-      if (audioPart) {
-        audioBuffer = Buffer.from(audioPart.inlineData.data, 'base64');
+    try {
+      if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          // Check for inlineData containing audio content
+          if (part.inlineData && part.inlineData.data && part.inlineData.mimeType.startsWith('audio/')) {
+            audioBuffer = Buffer.from(part.inlineData.data, 'base64');
+            break;
+          }
+        }
       }
+    } catch (parseError) {
+      console.error("Failed parsing raw audio parts:", parseError);
     }
     
-    if (audioBuffer) {
+    // 3. Handle Delivery to Telegram
+    if (audioBuffer && audioBuffer.length > 100) { // Ensures the file isn't empty/tiny
       fs.writeFileSync(tempFile, audioBuffer);
       
-      // 1. Send the voice clip first
+      // Send the actual voice clip
       await ctx.replyWithVoice({ source: tempFile });
       
-      // 2. Only send the text snippet if it actually contains words (avoids the 400 Empty error)
+      // Only send text if it exists and isn't a duplicate of the voice
       if (text && text.length > 0) {
         await ctx.reply(text);
       }
       
       fs.unlinkSync(tempFile);
     } else {
-      // Fallback if no audio clip was generated at all
-      await ctx.reply(text || "I processed that, but I've got nothing to say.");
+      // If audio extraction failed, fall back to standard text response
+      await ctx.reply(text || "I'm thinking, but I've got nothing to say.");
     }
 
   } catch (error) {
@@ -94,7 +103,7 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 4. Standard Launch Syntax (Clears conflicts safely via callback setting)
+// 4. Standard Launch Syntax
 bot.launch({
   allowedUpdates: ['message'],
   dropPendingUpdates: true 
