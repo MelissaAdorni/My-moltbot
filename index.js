@@ -17,7 +17,7 @@ bot.on("text", async (ctx) => {
   try {
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
-    // Construct the payload manually to guarantee Google receives the exact structure
+    // Construct the payload manually
     const payload = {
       contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
       generationConfig: {
@@ -39,10 +39,11 @@ bot.on("text", async (ctx) => {
     };
 
     const apiKey = process.env.GEMINI_API_KEY;
-    const modelEnv = process.env['gemini-3.1-flash'] || "gemini-3.1-flash-tts-preview";
+    
+    // FIXED: Explicitly hardcoding the true voice model so it never targets the "lite" version from Render variables
+    const targetModel = "gemini-3.1-flash-tts-preview";
 
-    // Call Google's API endpoint directly, bypassing the broken SDK helper entirely
-    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${modelEnv}:generateContent?key=${apiKey}`;
+    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
     const apiResponse = await fetch(apiURL, {
       method: "POST",
@@ -57,7 +58,6 @@ bot.on("text", async (ctx) => {
 
     const data = await apiResponse.json();
 
-    // Deep extraction from raw JSON chunks
     let text = "";
     let audioBase64 = "";
 
@@ -72,23 +72,21 @@ bot.on("text", async (ctx) => {
       }
     }
 
-    // Deliver to Telegram only if we successfully found real voice bytes
+    // Only try to build a file if we got real, substantial voice data back
     if (audioBase64 && audioBase64.length > 500) {
       const audioBuffer = Buffer.from(audioBase64, 'base64');
       fs.writeFileSync(tempFile, audioBuffer);
 
-      // Send voice note
       await ctx.replyWithVoice({ source: tempFile });
 
-      // Send companion text bubble if it generated transcript words
       if (text.trim().length > 0) {
         await ctx.reply(text.trim());
       }
 
       fs.unlinkSync(tempFile);
     } else {
-      // Emergency text fallback if Google gave us an empty audio channel
-      await ctx.reply(text.trim() || "My voice engine hit a snag, but I'm listening.");
+      // Fallback if the voice stream is still blank for any reason
+      await ctx.reply(text.trim() || "I'm processing, but my audio engine returned empty data.");
     }
 
   } catch (error) {
@@ -100,7 +98,7 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// 3. Standard Launch Syntax
+// 3. Standard Launch Syntax with dropPendingUpdates to break old zombie loops
 bot.launch({
   allowedUpdates: ['message'],
   dropPendingUpdates: true 
