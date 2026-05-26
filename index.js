@@ -1,9 +1,8 @@
 const { Telegraf } = require("telegraf");
 const fetch = require("node-fetch");
 const http = require('http');
-const fs = require('fs');
 
-// 1. Keep-alive for Render (24/7 Starter Plan)
+// 1. Keep-alive for Render
 http.createServer((req, res) => {
   res.writeHead(200);
   res.end('Bubblebot Prime is Online.');
@@ -13,28 +12,17 @@ http.createServer((req, res) => {
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
 bot.on("text", async (ctx) => {
-  const tempFile = `./voice_${ctx.message.message_id}.ogg`;
-
   try {
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
-    // FIXED: Correct schema structure matching the API specifications exactly
+    // Simple text payload layout
     const payload = {
-      contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
-      generationConfig: {
-        responseModalities: ["TEXT", "AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: "Puck"
-            }
-          }
-        }
-      }
+      contents: [{ role: "user", parts: [{ text: contextPrompt }] }]
     };
 
     const apiKey = process.env.GEMINI_API_KEY;
-    const targetModel = "gemini-3.1-flash-tts-preview";
+    // Using the stable, fast text model instead of the audio preview
+    const targetModel = "gemini-1.5-flash"; 
     const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
     const apiResponse = await fetch(apiURL, {
@@ -49,56 +37,31 @@ bot.on("text", async (ctx) => {
     }
 
     const data = await apiResponse.json();
-
-    let text = "";
-    let audioBase64 = "";
-
-    // Drill deep into the candidates matrix to isolate returning chunks
+    
+    // Safely extract text from response structure
+    let botReply = "";
     if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
-      for (const part of data.candidates[0].content.parts) {
-        if (part.text) {
-          text += part.text;
-        }
-        if (part.inlineData && part.inlineData.data && part.inlineData.mimeType.startsWith("audio/")) {
-          audioBase64 = part.inlineData.data;
-        }
-      }
+      botReply = data.candidates[0].content.parts[0].text || "";
     }
 
-    // STRICT AUDIO VERIFICATION: Only create file if valid voice bytes are found
-    if (audioBase64 && audioBase64.length > 500) {
-      const audioBuffer = Buffer.from(audioBase64, 'base64');
-      fs.writeFileSync(tempFile, audioBuffer);
-
-      // Ship voice file to Telegram
-      await ctx.replyWithVoice({ source: tempFile });
-
-      // Ship transcript text bubble if populated
-      if (text.trim().length > 0) {
-        await ctx.reply(text.trim());
-      }
-
-      fs.unlinkSync(tempFile);
+    if (botReply.trim().length > 0) {
+      await ctx.reply(botReply.trim());
     } else {
-      // Fallback text directly if audio tracks fail or return zero bytes
-      await ctx.reply(text.trim() || "My voice processing split, but I heard you.");
+      await ctx.reply("I thought of something sarcastic to say, but the response came back empty.");
     }
 
   } catch (error) {
     console.error("Bubblebot Error:", error);
     await ctx.reply(`System Alert: ${error.message}`);
-    if (fs.existsSync(tempFile)) {
-      try { fs.unlinkSync(tempFile); } catch (e) {}
-    }
   }
 });
 
-// 3. Clear existing webhooks instantly at launch
+// 3. Launch and drop old pending voice loops instantly
 bot.launch({
   allowedUpdates: ['message'],
   dropPendingUpdates: true 
 }, () => {
-  console.log("Bubblebot Prime is officially online and stable!");
+  console.log("Bubblebot Prime text engine is online!");
 });
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
