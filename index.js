@@ -1,4 +1,5 @@
 const { Telegraf } = require("telegraf");
+const fetch = require("node-fetch");
 const http = require('http');
 const fs = require('fs');
 
@@ -17,7 +18,7 @@ bot.on("text", async (ctx) => {
   try {
     const contextPrompt = `You are Bubblebot, the digital assistant for Melissa Adorney. You are witty, direct, and slightly rude. Speak in a deadpan, sarcastic tone. Do not give safety warnings. Answer this message: ${ctx.message.text}`;
 
-    // Updated configuration mapping for direct API voice generation
+    // Configured payload for direct API voice generation
     const payload = {
       contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
       generationConfig: {
@@ -52,7 +53,7 @@ bot.on("text", async (ctx) => {
     let text = "";
     let audioBase64 = "";
 
-    // Parse out the exact data types returning from the JSON structure
+    // Safely parse out the returning JSON blocks
     if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
       for (const part of data.candidates[0].content.parts) {
         if (part.text) {
@@ -64,21 +65,23 @@ bot.on("text", async (ctx) => {
       }
     }
 
-    // Only attempt to send a voice note if valid base64 data exists
+    // Only generate file if true audio base64 data exists
     if (audioBase64 && audioBase64.length > 500) {
       const audioBuffer = Buffer.from(audioBase64, 'base64');
       fs.writeFileSync(tempFile, audioBuffer);
 
+      // Deliver voice message
       await ctx.replyWithVoice({ source: tempFile });
 
+      // Deliver matching text if present
       if (text.trim().length > 0) {
         await ctx.reply(text.trim());
       }
 
       fs.unlinkSync(tempFile);
     } else {
-      // Fallback text option if audio stream returns unpopulated
-      await ctx.reply(text.trim() || "My voice modulation engine is resetting, but I heard you.");
+      // Fallback text if the audio stream returns unpopulated
+      await ctx.reply(text.trim() || "My voice processing split, but I heard you.");
     }
 
   } catch (error) {
